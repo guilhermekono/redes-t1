@@ -13,7 +13,7 @@
 #define LINKS_FILE "enlaces.config"
 
 pthread_mutex_t send_lock, receive_lock, output_lock;
-struct string_queue send_queue, receive_queue;
+struct msg_queue send_queue, receive_queue;
 int my_id;
 
 struct router {
@@ -40,8 +40,6 @@ void set_routers(void) {
 
   while (ip = (char*)malloc(sizeof(char) * 20), 
       fscanf(file, "%d %d %s", &id, &port, ip) == 3) {
-    printf("I got: %d %d %s\n", id, port, ip);
-
     routers[id].id = id;
     routers[id].port = port;
     routers[id].ip = ip;
@@ -63,7 +61,6 @@ void set_network(void) {
     assert(id2 < MAX_ROUTERS);
     assert(weight >= 0);
     network[id1][id2] = network[id2][id1] = weight;
-    printf("I got %d %d %d\n", id1, id2, weight);
   }
 }
 
@@ -85,7 +82,6 @@ int main(int argc, char **argv) {
   pthread_t sender_tid, receiver_tid;
 
   if (argc < 2) {
-    printf("%s\n", argv[0]);
     printf("Missing argument\n");
     printf("Correct usage: %s <router id>\n", argv[0]);
     exit(1);
