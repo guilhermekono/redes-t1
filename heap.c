@@ -101,30 +101,30 @@ void heap_print(const struct heap *heap, const int i) {
   heap_print(heap, ri);
 }
 
-int main(void) {
-  struct heap heap;
-  vwpair p;
-  heap_init(&heap, 100);
-  heap_reset(&heap);
-  int op;
-  vwpair val;
-  while (scanf("%d", &op) != EOF) {
-    if (op == 0) {
-      p = heap_pop(&heap);
-      printf("popped (w:%d, v:%d)\n=======\n", p.weight, p.weight);
-      heap_print(&heap, 0);
-    } else if (op == 1) {
-      printf("v w\n");
-      scanf("%d %d", &val.vertex, &val.weight);
-
-      heap_insert(&heap, val);
-      heap_print(&heap, 0);
-      for (int i = 0; i < heap.size; i++) {
-        printf("%d ", heap.tree[i]);
-      }
-      printf("\n");
-    }
-    printf("\n+++\n");
-  }
-  return 0;
-}
+// int main(void) {
+//   struct heap heap;
+//   vwpair p;
+//   heap_init(&heap, 100);
+//   heap_reset(&heap);
+//   int op;
+//   vwpair val;
+//   while (scanf("%d", &op) != EOF) {
+//     if (op == 0) {
+//       p = heap_pop(&heap);
+//       printf("popped (w:%d, v:%d)\n=======\n", p.weight, p.weight);
+//       heap_print(&heap, 0);
+//     } else if (op == 1) {
+//       printf("v w\n");
+//       scanf("%d %d", &val.vertex, &val.weight);
+// 
+//       heap_insert(&heap, val);
+//       heap_print(&heap, 0);
+//       for (int i = 0; i < heap.size; i++) {
+//         printf("%d ", heap.tree[i]);
+//       }
+//       printf("\n");
+//     }
+//     printf("\n+++\n");
+//   }
+//   return 0;
+// }

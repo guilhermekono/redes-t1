@@ -5,10 +5,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <assert.h>
+#include <pthread.h>
+#include "queue.h"
 
 #define MAX_ROUTERS 20
 #define ROUTERS_FILE "roteador.config"
 #define LINKS_FILE "enlaces.config"
+
+pthread_mutex_t send_lock, receive_lock, output_lock;
+struct string_queue send_queue, receive_queue;
+int my_id;
 
 struct router {
   int id;
@@ -61,9 +67,43 @@ void set_network(void) {
   }
 }
 
-int main(void) {
+void *receiver_thread(void *a) {
+  while (1) {
+    printf("I am the sender thread\n");
+  }
+}
+
+void *sender_thread(void *a) {
+  while (1) {
+    printf("I am the receiver thread\n");
+  }
+}
+
+int main(int argc, char **argv) {
+  char msg_content[100];
+  int destination;
+  pthread_t sender_tid, receiver_tid;
+
+  if (argc < 2) {
+    printf("%s\n", argv[0]);
+    printf("Missing argument\n");
+    printf("Correct usage: %s <router id>\n", argv[0]);
+    exit(1);
+  }
+
+  setbuf(stdout, NULL);
   set_routers();
   printf("\n");
   set_network();
+
+  pthread_create(&sender_tid, NULL, sender_thread, NULL);
+  pthread_create(&receiver_tid, NULL, receiver_thread, NULL);
+
+  while (1) {
+    printf("Message content: ");
+    scanf("%s", msg_content);
+    printf("Destination (router id): ");
+    scanf("%d", &destination);
+  }
   return 0;
 }

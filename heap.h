@@ -1,3 +1,4 @@
+#ifndef HEAP_H
 typedef struct vwpair {
   int vertex;
   int weight; // peso para chegar até o vértice
@@ -14,3 +15,5 @@ void heap_reset(struct heap *heap);
 void heap_insert(struct heap *heap, const vwpair p);
 
 vwpair heap_pop(struct heap *heap);
+#define HEAP
+#endif

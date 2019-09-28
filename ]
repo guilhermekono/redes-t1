@@ -1,0 +1,15 @@
+#ifndef MESSAGE_H
+
+#define QUEUE_MAX 100
+
+/**
+ * Formatação da mensagem:
+ * "<id_destino>
+ */
+
+struct message_queue {
+
+};
+
+#define MESSAGE_H
+#endif
