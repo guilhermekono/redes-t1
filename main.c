@@ -6,20 +6,24 @@
 #include <unistd.h>
 #include <assert.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include "queue.h"
 
 #define MAX_ROUTERS 20
 #define ROUTERS_FILE "roteador.config"
 #define LINKS_FILE "enlaces.config"
 
+#define IP_STR_LEN 20
+
 pthread_mutex_t send_lock, receive_lock, output_lock;
+sem_t send_sem, receive_sem;
 struct msg_queue send_queue, receive_queue;
-int my_id;
+int my_id, my_socket;
 
 struct router {
   int id;
   int port;
-  char *ip;
+  char ip[IP_STR_LEN];
 };
 
 /**
@@ -31,21 +35,24 @@ int network[MAX_ROUTERS][MAX_ROUTERS];
 
 struct router routers[MAX_ROUTERS];
 
+void error(const char *str) {
+  fprintf(stderr, "Error: %s\n", str);
+  exit(1);
+}
+
 void set_routers(void) {
   int id, port;
-  char *ip;
+  char ip[IP_STR_LEN];
   FILE *file = fopen(ROUTERS_FILE, "r");
 
   assert(file != NULL);
 
-  while (ip = (char*)malloc(sizeof(char) * 20), 
-      fscanf(file, "%d %d %s", &id, &port, ip) == 3) {
+  while (fscanf(file, "%d %d %s", &id, &port, ip) == 3) {
     routers[id].id = id;
     routers[id].port = port;
-    routers[id].ip = ip;
+    strcpy(routers[id].ip, ip);
   }
 
-  free(ip);
   fclose(file);
 }
 
@@ -65,20 +72,61 @@ void set_network(void) {
 }
 
 void *receiver_thread(void *a) {
+  Msg msg;
+  struct sockaddr_in my_addr;
+  my_addr.sin_family = AF_INET;
+  my_addr.sin_port = htons((uint16_t)routers[my_id].port);
+  if (inet_aton(routers[my_id].ip, &my_addr.sin_addr) == 0) {
+    error("inet_aton FAILED in receiver_thread");
+  }
+
+  if (bind(my_socket, (const struct sockaddr*)&my_addr, sizeof(my_addr)) == -1) {
+    error("bind FAILED in receiver_thread");
+  }
+
   while (1) {
-    printf("I am the sender thread\n");
+    if (recv(my_socket, (void*)&msg, sizeof(msg), 0) == -1) {
+      error("recv FAILED in receiver_thread");
+    }
+
+    printf("I got a message\n");
   }
 }
 
 void *sender_thread(void *a) {
+  Msg msg;
+  struct sockaddr_in addr_dest;
+  addr_dest.sin_family = AF_INET;
+
+
   while (1) {
-    printf("I am the receiver thread\n");
+    //printf("I am the receiver thread\n");
+    sem_wait(&send_sem);
+    pthread_mutex_lock(&send_lock);
+    queue_pop(&send_queue, &msg);
+    pthread_mutex_unlock(&send_lock);
+    printf("I will try to send a message\n");
+
+    addr_dest.sin_port = htons((uint16_t)routers[msg.destination].port);
+    if (inet_aton(routers[msg.destination].ip, 
+          &addr_dest.sin_addr) == -1) {
+      error("inet_aton FAILED in sender_thread");
+    }
+
+    if (sendto(
+          my_socket, 
+          &msg, 
+          sizeof(msg), 
+          0, 
+          (struct sockaddr*)&addr_dest, 
+          sizeof(addr_dest)) == -1) {
+      printf("could not send message\n");
+    }
   }
 }
 
 int main(int argc, char **argv) {
-  char msg_content[100];
-  int destination;
+  Msg msg;
   pthread_t sender_tid, receiver_tid;
 
   if (argc < 2) {
@@ -86,20 +134,40 @@ int main(int argc, char **argv) {
     printf("Correct usage: %s <router id>\n", argv[0]);
     exit(1);
   }
+  my_id = atoi(argv[1]);
+  my_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (my_socket == -1) {
+    error("could not create socket");
+  }
 
   setbuf(stdout, NULL);
   set_routers();
   printf("\n");
   set_network();
 
+  sem_init(&send_sem, 0, 0);
+  sem_init(&receive_sem, 0, 0);
+  queue_init(&send_queue);
+  queue_init(&receive_queue);
+
   pthread_create(&sender_tid, NULL, sender_thread, NULL);
   pthread_create(&receiver_tid, NULL, receiver_thread, NULL);
 
   while (1) {
     printf("Message content: ");
-    scanf("%s", msg_content);
+    scanf("%s", msg.content);
     printf("Destination (router id): ");
-    scanf("%d", &destination);
+    scanf("%d", &msg.destination);
+    msg.origin = my_id;
+    msg.type = 0;
+
+    pthread_mutex_lock(&send_lock);
+    if (queue_push(&send_queue, msg)) {
+      sem_post(&send_sem);
+    } else {
+      printf("The send queue is full, message discarded\n");
+    }
+    pthread_mutex_unlock(&send_lock);
   }
   return 0;
 }
