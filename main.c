@@ -17,6 +17,7 @@
 
 pthread_mutex_t send_lock, receive_lock, output_lock;
 sem_t send_sem, receive_sem;
+sem_t ack_sem[MAX_ROUTERS];
 struct msg_queue send_queue, receive_queue;
 int my_id, my_socket;
 
@@ -97,6 +98,8 @@ void *sender_thread(void *a) {
   Msg msg;
   struct sockaddr_in addr_dest;
   addr_dest.sin_family = AF_INET;
+  int attempts, confirmed;
+  struct timespec time_wait;
 
 
   while (1) {
@@ -114,16 +117,31 @@ void *sender_thread(void *a) {
       error("inet_aton FAILED in sender_thread");
     }
 
-    if (sendto(
-          my_socket, 
-          &msg, 
-          sizeof(msg), 
-          0, 
-          (struct sockaddr*)&addr_dest, 
-          sizeof(addr_dest)) == -1) {
-      printf("could not send message\n");
-    } else {
-      printf("I sent the message\n");
+    attempts = 3;
+    confirmed = 0;
+    while (attempts > 0 && !confirmed) {
+      if (sendto(
+            my_socket, 
+            &msg, 
+            sizeof(msg), 
+            0, 
+            (struct sockaddr*)&addr_dest, 
+            sizeof(addr_dest)) == -1) {
+        printf("could not send message\n");
+      } else {
+        printf("I sent the message\n");
+        clock_gettime(CLOCK_REALTIME, &time_wait);
+        time_wait.tv_sec += 2;
+        printf("I will wait for confirmation\n");
+        if (sem_timedwait(&ack_sem[msg.destination], &time_wait) == 0) {
+          confirmed = 1;
+          printf("the message was confirmed\n");
+        }
+      }
+      if (!confirmed) {
+        printf("The message was not confirmed\n");
+      }
+      attempts--;
     }
   }
 }
@@ -155,6 +173,9 @@ int main(int argc, char **argv) {
 
   sem_init(&send_sem, 0, 0);
   sem_init(&receive_sem, 0, 0);
+  for (int i = 0; i < MAX_ROUTERS; i++) {
+    sem_init(&ack_sem[i], 0, 0);
+  }
   queue_init(&send_queue);
   queue_init(&receive_queue);
 
@@ -167,7 +188,7 @@ int main(int argc, char **argv) {
     printf("Destination (router id): ");
     scanf("%d", &msg.destination);
     msg.origin = my_id;
-    msg.type = 0;
+    msg.type = MSG_MSG;
 
     pthread_mutex_lock(&send_lock);
     if (queue_push(&send_queue, msg)) {

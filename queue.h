@@ -2,6 +2,9 @@
 
 #define QUEUE_MAX 2
 
+#define MSG_MSG 0
+#define MSG_ACK 1
+
 typedef struct message {
   int type, origin, destination;
   char content[101];
