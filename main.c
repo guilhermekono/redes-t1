@@ -108,6 +108,7 @@ void *sender_thread(void *a) {
     printf("I will try to send a message\n");
 
     addr_dest.sin_port = htons((uint16_t)routers[msg.destination].port);
+    printf("the destination is %d\n", msg.destination);
     if (inet_aton(routers[msg.destination].ip, 
           &addr_dest.sin_addr) == -1) {
       error("inet_aton FAILED in sender_thread");
@@ -121,6 +122,8 @@ void *sender_thread(void *a) {
           (struct sockaddr*)&addr_dest, 
           sizeof(addr_dest)) == -1) {
       printf("could not send message\n");
+    } else {
+      printf("I sent the message\n");
     }
   }
 }
@@ -145,6 +148,11 @@ int main(int argc, char **argv) {
   printf("\n");
   set_network();
 
+  for (int i = 0; i < 10; i++) {
+    printf("%d id(%d) port(%d) ip(%s)\n", 
+        i, routers[i].id, routers[i].port, routers[i].ip);
+  }
+
   sem_init(&send_sem, 0, 0);
   sem_init(&receive_sem, 0, 0);
   queue_init(&send_queue);
@@ -167,6 +175,7 @@ int main(int argc, char **argv) {
     } else {
       printf("The send queue is full, message discarded\n");
     }
+
     pthread_mutex_unlock(&send_lock);
   }
   return 0;
