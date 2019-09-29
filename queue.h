@@ -7,6 +7,7 @@
 
 typedef struct message {
   int type, origin, destination;
+  int id; // 0 or 1 (stop and wait)
   char content[101];
 } Msg;
 

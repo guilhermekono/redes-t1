@@ -91,6 +91,31 @@ void *receiver_thread(void *a) {
     }
 
     printf("I got a message\n");
+    printf("%s\n", msg.content);
+
+    if (msg.destination != my_id) { // message not for me
+      pthread_mutex_lock(&send_lock);
+      queue_push(&send_queue, msg);
+      pthread_mutex_unlock(&send_lock);
+    } else if (msg.type == MSG_ACK) { // confirmation
+      printf("I got an ACK\n");
+      sem_post(&ack_sem[msg.origin]);
+    } else { // message for me
+      printf("THERE IS A MESSAGE FOR ME\n");
+      pthread_mutex_lock(&send_lock);
+      int aux = msg.origin; // swap origin and destination
+      msg.origin = msg.destination;
+      msg.destination = aux;
+      msg.type = MSG_ACK;
+      if (queue_push(&send_queue, msg)) {
+        sem_post(&send_sem);
+      }
+      pthread_mutex_unlock(&send_lock);
+    }
+
+    pthread_mutex_lock(&receive_lock);
+    queue_push(&receive_queue, msg);
+    pthread_mutex_unlock(&receive_lock);
   }
 }
 
@@ -128,7 +153,7 @@ void *sender_thread(void *a) {
             (struct sockaddr*)&addr_dest, 
             sizeof(addr_dest)) == -1) {
         printf("could not send message\n");
-      } else {
+      } else if (msg.type == MSG_MSG) {
         printf("I sent the message\n");
         clock_gettime(CLOCK_REALTIME, &time_wait);
         time_wait.tv_sec += 2;
