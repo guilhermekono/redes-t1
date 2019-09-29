@@ -220,14 +220,18 @@ int main(int argc, char **argv) {
     msg.origin = my_id;
     msg.type = MSG_MSG;
 
-    pthread_mutex_lock(&send_lock[msg.destination]);
-    if (queue_push(&send_queue[msg.destination], msg)) {
-      sem_post(&send_sem[msg.destination]);
+    if (msg.destination == my_id) {
+      printf("You can't send a message to yourself\n");
     } else {
-      printf("The send queue is full, message discarded\n");
-    }
+      pthread_mutex_lock(&send_lock[msg.destination]);
+      if (queue_push(&send_queue[msg.destination], msg)) {
+        sem_post(&send_sem[msg.destination]);
+      } else {
+        printf("The send queue is full, message discarded\n");
+      }
 
-    pthread_mutex_unlock(&send_lock[msg.destination]);
+      pthread_mutex_unlock(&send_lock[msg.destination]);
+    }
   }
   return 0;
 }
