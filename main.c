@@ -15,10 +15,10 @@
 
 #define IP_STR_LEN 20
 
-pthread_mutex_t send_lock, receive_lock, output_lock;
-sem_t send_sem, receive_sem;
+pthread_mutex_t send_lock[MAX_ROUTERS], receive_lock, output_lock;
+sem_t send_sem[MAX_ROUTERS], receive_sem;
 sem_t ack_sem[MAX_ROUTERS];
-struct msg_queue send_queue, receive_queue;
+struct msg_queue send_queue[MAX_ROUTERS], receive_queue;
 int my_id, my_socket;
 
 struct router {
@@ -94,23 +94,23 @@ void *receiver_thread(void *a) {
     printf("%s\n", msg.content);
 
     if (msg.destination != my_id) { // message not for me
-      pthread_mutex_lock(&send_lock);
-      queue_push(&send_queue, msg);
-      pthread_mutex_unlock(&send_lock);
+      pthread_mutex_lock(&send_lock[msg.destination]);
+      queue_push(&send_queue[msg.destination], msg);
+      pthread_mutex_unlock(&send_lock[msg.destination]);
     } else if (msg.type == MSG_ACK) { // confirmation
       printf("I got an ACK\n");
       sem_post(&ack_sem[msg.origin]);
     } else { // message for me
       printf("THERE IS A MESSAGE FOR ME\n");
-      pthread_mutex_lock(&send_lock);
+      pthread_mutex_lock(&send_lock[msg.destination]);
       int aux = msg.origin; // swap origin and destination
       msg.origin = msg.destination;
       msg.destination = aux;
       msg.type = MSG_ACK;
-      if (queue_push(&send_queue, msg)) {
-        sem_post(&send_sem);
+      if (queue_push(&send_queue[msg.destination], msg)) {
+        sem_post(&send_sem[msg.destination]);
       }
-      pthread_mutex_unlock(&send_lock);
+      pthread_mutex_unlock(&send_lock[msg.destination]);
     }
 
     pthread_mutex_lock(&receive_lock);
@@ -119,20 +119,22 @@ void *receiver_thread(void *a) {
   }
 }
 
-void *sender_thread(void *a) {
+void *sender_thread(void *arg) {
+  // this thread is responsible to sending
+  // messages to the router with id tid
+  int tid = *(int*)arg;
   Msg msg;
   struct sockaddr_in addr_dest;
   addr_dest.sin_family = AF_INET;
   int attempts, confirmed;
   struct timespec time_wait;
 
-
   while (1) {
     //printf("I am the receiver thread\n");
-    sem_wait(&send_sem);
-    pthread_mutex_lock(&send_lock);
-    queue_pop(&send_queue, &msg);
-    pthread_mutex_unlock(&send_lock);
+    sem_wait(&send_sem[tid]);
+    pthread_mutex_lock(&send_lock[tid]);
+    queue_pop(&send_queue[tid], &msg);
+    pthread_mutex_unlock(&send_lock[tid]);
     printf("I will try to send a message\n");
 
     addr_dest.sin_port = htons((uint16_t)routers[msg.destination].port);
@@ -142,11 +144,10 @@ void *sender_thread(void *a) {
       error("inet_aton FAILED in sender_thread");
     }
 
-    attempts = 3;
+    attempts = msg.type == MSG_MSG ? 3 : 1;
     confirmed = 0;
     while (attempts > 0 && !confirmed) {
-      if (sendto(
-            my_socket, 
+      if (sendto(my_socket, 
             &msg, 
             sizeof(msg), 
             0, 
@@ -196,16 +197,20 @@ int main(int argc, char **argv) {
         i, routers[i].id, routers[i].port, routers[i].ip);
   }
 
-  sem_init(&send_sem, 0, 0);
   sem_init(&receive_sem, 0, 0);
+  queue_init(&receive_queue);
   for (int i = 0; i < MAX_ROUTERS; i++) {
     sem_init(&ack_sem[i], 0, 0);
+    sem_init(&send_sem[i], 0, 0);
+    queue_init(&send_queue[i]);
   }
-  queue_init(&send_queue);
-  queue_init(&receive_queue);
 
-  pthread_create(&sender_tid, NULL, sender_thread, NULL);
   pthread_create(&receiver_tid, NULL, receiver_thread, NULL);
+  for (int i = 0; i < MAX_ROUTERS; i++) {
+    int *arg = (int*)malloc(sizeof(int));
+    *arg = i;
+    pthread_create(&sender_tid, NULL, sender_thread, (void*)arg);
+  }
 
   while (1) {
     printf("Message content: ");
@@ -215,14 +220,14 @@ int main(int argc, char **argv) {
     msg.origin = my_id;
     msg.type = MSG_MSG;
 
-    pthread_mutex_lock(&send_lock);
-    if (queue_push(&send_queue, msg)) {
-      sem_post(&send_sem);
+    pthread_mutex_lock(&send_lock[msg.destination]);
+    if (queue_push(&send_queue[msg.destination], msg)) {
+      sem_post(&send_sem[msg.destination]);
     } else {
       printf("The send queue is full, message discarded\n");
     }
 
-    pthread_mutex_unlock(&send_lock);
+    pthread_mutex_unlock(&send_lock[msg.destination]);
   }
   return 0;
 }
