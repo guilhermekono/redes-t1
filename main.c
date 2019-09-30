@@ -108,7 +108,7 @@ void *sender_thread(void *arg) {
       error("inet_aton FAILED in sender_thread");
     }
 
-    int reliable_del = msg.type == MSG_MSG && network[my_id][msg.destination] != -1;
+    int reliable_del = msg.type == MSG_MSG && msg.origin == my_id;
     if (reliable_del) {
       printf("I will use reliable delivery\n");
     } else {
