@@ -32,41 +32,11 @@ void set_network(int network[MAX_ROUTERS][MAX_ROUTERS]) {
   assert(file != NULL);
 
   memset(network, -1, sizeof(int) * MAX_ROUTERS * MAX_ROUTERS);
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    for (int j = 0; j < MAX_ROUTERS; j++) {
-      printf("%d ", network[i][j]);
-    }
-    printf("\n");
-  }
   while (fscanf(file, "%d %d %d", &id1, &id2, &weight) == 3) {
     assert(id1 < MAX_ROUTERS);
     assert(id2 < MAX_ROUTERS);
     assert(weight >= 0);
     network[id1][id2] = network[id2][id1] = weight;
-  }
-
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    printf("-");
-  }
-  printf("\n");
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    for (int j = 0; j < MAX_ROUTERS; j++) {
-      printf("%d ", network[i][j]);
-    }
-    printf("\n");
-  }
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    printf("-");
-  }
-  printf("\n");
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    printf("%d -> ", i);
-    for (int j = 0; j < MAX_ROUTERS; j++) {
-      if (network[i][j] != -1) {
-        printf(" %d", j);
-      }
-    }
-    printf("\n");
   }
 }
 
@@ -108,20 +78,14 @@ void set_paths(int network[MAX_ROUTERS][MAX_ROUTERS],
     //weight[pop.vertex] = pop.weight;
     ok[pop.vertex] = 1;
 
-    printf("I popped %d\n", pop.vertex);
-    
     for (int i = 0; i < MAX_ROUTERS; i++) {
       vw.vertex = i;
       vw.prev_vertex = pop.vertex;
       vw.weight = weight[pop.vertex] + network[pop.vertex][vw.vertex];
 
-      if (network[beg][i] != -1) {
-        printf("this is %d and %d\n", i, network[beg][i]);
-      }
       if (network[pop.vertex][i] != -1 && 
           !ok[i] && 
           vw.weight < weight[vw.vertex]) {
-        printf("wololo\n");
         weight[vw.vertex] = vw.weight;
         prev_vertex[vw.vertex] = pop.vertex;
         heap_insert(&heap, vw);
@@ -129,18 +93,9 @@ void set_paths(int network[MAX_ROUTERS][MAX_ROUTERS],
     }
   }
 
-  printf("set_paths got to the end\n");
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    printf("%d -> %d\n", prev_vertex[i], i);
-  }
-  printf("\n");
-  for (int i = 0; i < MAX_ROUTERS; i++) {
-    printf("%d: %d\n", i, weight[i]);
-  }
 
   for (int i = 0; i < MAX_ROUTERS; i++) {
     next_vertex_to[i] = get_next_vertex_to(i, beg, prev_vertex);
-    printf("from %d to %d first go %d\n", beg, i, next_vertex_to[i]);
   }
 
 }
