@@ -3,13 +3,13 @@
 #include "heap.h"
 
 void heap_init(struct heap *heap, const int maxsize) {
-  heap->tree = (vwpair*) malloc(sizeof(vwpair) * maxsize);
+  // heap->tree = (vwpair*) malloc(sizeof(vwpair) * maxsize);
 
   heap->maxsize = maxsize;
   heap->size = 0;
 }
 
-void heap_end(struct heap *heap) { free(heap->tree); }
+//void heap_end(struct heap *heap) { free(heap->tree); }
 
 void heap_reset(struct heap *heap) { heap->size = 0; }
 

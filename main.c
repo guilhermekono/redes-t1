@@ -8,68 +8,19 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include "queue.h"
-
-#define MAX_ROUTERS 20
-#define ROUTERS_FILE "roteador.config"
-#define LINKS_FILE "enlaces.config"
-
-#define IP_STR_LEN 20
+#include "topology.h"
 
 pthread_mutex_t send_lock[MAX_ROUTERS], receive_lock, output_lock;
 sem_t send_sem[MAX_ROUTERS], receive_sem;
 sem_t ack_sem[MAX_ROUTERS];
 struct msg_queue send_queue[MAX_ROUTERS], receive_queue;
 int my_id, my_socket;
-
-struct router {
-  int id;
-  int port;
-  char ip[IP_STR_LEN];
-};
-
-/**
- * matriz de adjacência da rede
- * se o valor for nao negativo, representa o peso da aresta
- * se for -1, nao existe enlace
- */
-int network[MAX_ROUTERS][MAX_ROUTERS];
-
 struct router routers[MAX_ROUTERS];
+int next_vertex_to[MAX_ROUTERS];
 
 void error(const char *str) {
   fprintf(stderr, "Error: %s\n", str);
   exit(1);
-}
-
-void set_routers(void) {
-  int id, port;
-  char ip[IP_STR_LEN];
-  FILE *file = fopen(ROUTERS_FILE, "r");
-
-  assert(file != NULL);
-
-  while (fscanf(file, "%d %d %s", &id, &port, ip) == 3) {
-    routers[id].id = id;
-    routers[id].port = port;
-    strcpy(routers[id].ip, ip);
-  }
-
-  fclose(file);
-}
-
-void set_network(void) {
-  int id1, id2, weight;
-  FILE *file = fopen(LINKS_FILE, "r");
-
-  assert(file != NULL);
-
-  memset(network, -1, MAX_ROUTERS * MAX_ROUTERS);
-  while (fscanf(file, "%d %d %d", &id1, &id2, &weight) == 3) {
-    assert(id1 < MAX_ROUTERS);
-    assert(id2 < MAX_ROUTERS);
-    assert(weight >= 0);
-    network[id1][id2] = network[id2][id1] = weight;
-  }
 }
 
 void *receiver_thread(void *a) {
@@ -123,6 +74,7 @@ void *sender_thread(void *arg) {
   // this thread is responsible to sending
   // messages to the router with id tid
   int tid = *(int*)arg;
+  free(arg);
   Msg msg;
   struct sockaddr_in addr_dest;
   addr_dest.sin_family = AF_INET;
@@ -188,9 +140,9 @@ int main(int argc, char **argv) {
   }
 
   setbuf(stdout, NULL);
-  set_routers();
+  set_routers(routers);
+  dijkstra(my_id, next_vertex_to);
   printf("\n");
-  set_network();
 
   for (int i = 0; i < 10; i++) {
     printf("%d id(%d) port(%d) ip(%s)\n", 
