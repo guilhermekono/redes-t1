@@ -18,7 +18,8 @@ struct router {
  */
 
 void set_routers(struct router routers[MAX_ROUTERS]);
-void dijkstra(int beg, int next_vertex_to[MAX_ROUTERS]);
+void set_network(int network[MAX_ROUTERS][MAX_ROUTERS]);
+void set_paths(int network[MAX_ROUTERS][MAX_ROUTERS], int beg, int next_vertex_to[MAX_ROUTERS]);
 
 #define TOPOLOGY_H
 #endif

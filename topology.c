@@ -6,8 +6,6 @@
 #include <assert.h>
 #include <limits.h>
 
-static int network[MAX_ROUTERS][MAX_ROUTERS];
-
 void set_routers(struct router routers[MAX_ROUTERS]) {
   int id, port;
   char ip[IP_STR_LEN];
@@ -27,13 +25,13 @@ void set_routers(struct router routers[MAX_ROUTERS]) {
   fclose(file);
 }
 
-static void set_network(void) {
+void set_network(int network[MAX_ROUTERS][MAX_ROUTERS]) {
   int id1, id2, weight;
   FILE *file = fopen(LINKS_FILE, "r");
 
   assert(file != NULL);
 
-  memset(network, -1, sizeof(network));
+  memset(network, -1, sizeof(int) * MAX_ROUTERS * MAX_ROUTERS);
   for (int i = 0; i < MAX_ROUTERS; i++) {
     for (int j = 0; j < MAX_ROUTERS; j++) {
       printf("%d ", network[i][j]);
@@ -72,15 +70,18 @@ static void set_network(void) {
   }
 }
 
-static int get_next_vertex_to(int v, int beg, int prev_vertex[MAX_ROUTERS]) {
+static int get_next_vertex_to(int v, 
+                              int beg, 
+                              int prev_vertex[MAX_ROUTERS]) {
   if (v == -1) return -1;
   if (prev_vertex[v] == beg) return v;
   return get_next_vertex_to(prev_vertex[v], beg, prev_vertex);
 }
 
 // needs to be called after set_network
-void dijkstra(int beg, int next_vertex_to[MAX_ROUTERS]) {
-  set_network();
+void set_paths(int network[MAX_ROUTERS][MAX_ROUTERS], 
+               int beg, 
+               int next_vertex_to[MAX_ROUTERS]) {
   int weight[MAX_ROUTERS];
   // weight[i] is the weight of the full path from beg to i
   for (int i = 0; i < MAX_ROUTERS; i++) {
@@ -128,7 +129,7 @@ void dijkstra(int beg, int next_vertex_to[MAX_ROUTERS]) {
     }
   }
 
-  printf("dijkstra got to the end\n");
+  printf("set_paths got to the end\n");
   for (int i = 0; i < MAX_ROUTERS; i++) {
     printf("%d -> %d\n", prev_vertex[i], i);
   }

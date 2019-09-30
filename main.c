@@ -16,7 +16,8 @@ sem_t ack_sem[MAX_ROUTERS];
 struct msg_queue send_queue[MAX_ROUTERS], receive_queue;
 int my_id, my_socket;
 struct router routers[MAX_ROUTERS];
-int next_vertex_to[MAX_ROUTERS];
+int next_router_to[MAX_ROUTERS];
+int network[MAX_ROUTERS][MAX_ROUTERS];
 
 void error(const char *str) {
   fprintf(stderr, "Error: %s\n", str);
@@ -45,12 +46,23 @@ void *receiver_thread(void *a) {
     printf("%s\n", msg.content);
 
     if (msg.destination != my_id) { // message not for me
-      pthread_mutex_lock(&send_lock[msg.destination]);
-      queue_push(&send_queue[msg.destination], msg);
-      pthread_mutex_unlock(&send_lock[msg.destination]);
-    } else if (msg.type == MSG_ACK) { // confirmation
+      int next_router = next_router_to[msg.destination];
+      printf("I am forwarding a message from %d to %d, next router is %d\n", msg.origin, msg.destination, next_router);
+      pthread_mutex_lock(&send_lock[next_router]);
+      if (queue_push(&send_queue[next_router], msg)) {
+        sem_post(&send_sem[next_router]);
+      }
+      pthread_mutex_unlock(&send_lock[next_router]);
+    } else if (msg.type == MSG_ACK && msg.destination == my_id) { // confirmation for me
       printf("I got an ACK\n");
       sem_post(&ack_sem[msg.origin]);
+    } else if (msg.type == MSG_ACK && msg.destination != my_id) { // confirmation for another router
+      int next_router = next_router_to[msg.destination];
+      pthread_mutex_lock(&send_lock[next_router]);
+      if (queue_push(&send_queue[next_router], msg)) {
+        sem_post(&send_sem[next_router]);
+      }
+      pthread_mutex_unlock(&send_lock[next_router]);
     } else { // message for me
       printf("THERE IS A MESSAGE FOR ME\n");
       pthread_mutex_lock(&send_lock[msg.destination]);
@@ -89,14 +101,21 @@ void *sender_thread(void *arg) {
     pthread_mutex_unlock(&send_lock[tid]);
     printf("I will try to send a message\n");
 
-    addr_dest.sin_port = htons((uint16_t)routers[msg.destination].port);
+    addr_dest.sin_port = htons((uint16_t)routers[tid].port);
     printf("the destination is %d\n", msg.destination);
-    if (inet_aton(routers[msg.destination].ip, 
+    if (inet_aton(routers[tid].ip, 
           &addr_dest.sin_addr) == -1) {
       error("inet_aton FAILED in sender_thread");
     }
 
-    attempts = msg.type == MSG_MSG ? 3 : 1;
+    int reliable_del = msg.type == MSG_MSG && network[my_id][msg.destination] != -1;
+    if (reliable_del) {
+      printf("I will use reliable delivery\n");
+    } else {
+      printf("I will NOT use reliable delivery\n");
+    }
+
+    attempts = reliable_del ? 3 : 1;
     confirmed = 0;
     while (attempts > 0 && !confirmed) {
       if (sendto(my_socket, 
@@ -109,7 +128,7 @@ void *sender_thread(void *arg) {
       } else if (msg.type == MSG_MSG) {
         printf("I sent the message\n");
         clock_gettime(CLOCK_REALTIME, &time_wait);
-        time_wait.tv_sec += 2;
+        time_wait.tv_sec += reliable_del ? 2 : 0;
         printf("I will wait for confirmation\n");
         if (sem_timedwait(&ack_sem[msg.destination], &time_wait) == 0) {
           confirmed = 1;
@@ -141,7 +160,8 @@ int main(int argc, char **argv) {
 
   setbuf(stdout, NULL);
   set_routers(routers);
-  dijkstra(my_id, next_vertex_to);
+  set_network(network);
+  set_paths(network, my_id, next_router_to);
   printf("\n");
 
   for (int i = 0; i < 10; i++) {
@@ -175,14 +195,15 @@ int main(int argc, char **argv) {
     if (msg.destination == my_id) {
       printf("You can't send a message to yourself\n");
     } else {
-      pthread_mutex_lock(&send_lock[msg.destination]);
-      if (queue_push(&send_queue[msg.destination], msg)) {
-        sem_post(&send_sem[msg.destination]);
+      int next_router = next_router_to[msg.destination];
+      pthread_mutex_lock(&send_lock[next_router]);
+      if (queue_push(&send_queue[next_router], msg)) {
+        sem_post(&send_sem[next_router]);
       } else {
         printf("The send queue is full, message discarded\n");
       }
 
-      pthread_mutex_unlock(&send_lock[msg.destination]);
+      pthread_mutex_unlock(&send_lock[next_router]);
     }
   }
   return 0;
