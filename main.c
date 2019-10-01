@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
 
   printf("Usage: <destination> <message>\n");
   printf("Example: '3 msgexmaple' sends a message with content 'msgexmaple' to router 3\n");
+  printf("Warning: the message cannot contain spaces\n");
 
   my_id = atoi(argv[1]);
   my_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
