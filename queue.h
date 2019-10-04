@@ -1,6 +1,6 @@
 #ifndef MESSAGE_H
 
-#define QUEUE_MAX 2
+#define QUEUE_MAX 4
 
 #define MSG_MSG 0
 #define MSG_ACK 1
